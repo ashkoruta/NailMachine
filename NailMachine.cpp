@@ -5,6 +5,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
+#include <fstream>
 
 // global constants
 const int DotSize = 1; // 1 mm is minimal diameter possible
@@ -71,7 +72,59 @@ cv::Mat simplifyImageLUT(const cv::Mat &in, const int colorCount)
 	cv::LUT(in, lookUpTable, out); // it simplifies channels, so we get not colorCount, but colorCount^3 colors (!)
 	return out;
 }
-
+void outputToolPath(const cv::Mat &im, int vMeshCount, int vMeshSz, int hMeshCount, int hMeshSz)
+{
+	/* general outline
+		1) reduce block of the same colors to matrix vMeshSz x hMeshSz
+		2) same color == all three channels are the same. split into three channels. for each block
+		   1) for each channel: subtract value of this block from others. apply NOT. get 1 there value was the same
+		   2) AND three channel results. resulting matrix is same-color with this block
+		3) this matrix can be considered a bitmap for path points
+	*/
+	std::ofstream out("toolpaths.txt");
+	// reduced matrix
+	cv::Mat convert;
+	im.assignTo(convert, CV_16SC3); // store data in 16-bit signed shorts
+	cv::Mat small(vMeshCount, hMeshCount, CV_16SC3);
+	for (int v = 0; v < vMeshCount; ++v) {
+		for (int h = 0; h < hMeshCount; ++h) {
+			small.at<cv::Vec3s>(v, h) = convert.at<cv::Vec3s>(v*vMeshSz, h*hMeshSz); // Vec3s = vector of 3 shorts
+		}
+	}
+	// split into 3
+	std::vector<cv::Mat> spl;
+	cv::split(small, spl);
+	cv::Mat alreadyProcessed = cv::Mat::zeros(small.rows, small.cols, CV_16SC1); // boolean matrix: no need to check block if it was already matched with something
+	// for each block of reduced matrix
+	CV_Assert(small.rows == vMeshCount);
+	CV_Assert(small.cols == hMeshCount);
+	
+	for (int i = 0; i < small.rows; ++i) {
+		for (int j = 0; j < small.cols; ++j) {
+			if (alreadyProcessed.at<short>(i, j))
+				continue;
+			// if match for it wasn't yet found, construct maps for channels
+			const cv::Vec3s val = small.at<cv::Vec3s>(i, j);
+			cv::Mat diff = cv::Mat::ones(small.rows, small.cols, CV_16SC1); // final result of 3 ANDs will be here
+			for (int ch = 0; ch < ChannelNumber; ++ch) {
+				// make matrix of val[ch] and subtract it from original channel
+				TRACE << "cur val " << val[ch] << std::endl;
+				TRACE << "channel " << spl[ch] << std::endl;
+				cv::Mat tmp = cv::Mat::ones(small.rows, small.cols, CV_16SC1);
+				tmp = spl[ch] - tmp*val[ch];
+				TRACE << "SUBTRACT " << tmp << std::endl;
+				TRACE << "NOT " << ~tmp << std::endl;
+				diff = diff & (~tmp); // 0 where color channel is the same, not zero otherwise => logical not and then AND with previous result
+				TRACE << "AND with prev " << diff << std::endl;
+			}
+			// ok, we have a matrix of 1's where all channels are the same as in our current block
+			// these blocks should not be tested in future
+			alreadyProcessed = alreadyProcessed | diff;
+			out << i << "," << j << std::endl;
+			out << diff << std::endl;
+		}
+	}
+}
 int main(int argc, char** argv)
 {
 	// open the file
@@ -98,6 +151,8 @@ int main(int argc, char** argv)
 	const int vMeshSize = hMeshSize; // mesh is square so vertical size is the same
 	const int vMeshCount = input.rows / vMeshSize + (input.rows % vMeshSize ? 1 : 0); // how many square meshes needed to fill full length
 	std::cout << "pixels per mesh: vMeshSize = " << vMeshSize << " hMeshSize = " << hMeshSize << std::endl;
+	std::cout << hMeshCount << " horizontal and " << vMeshCount << " vertical meshes" << std::endl;
+	//TODO pack all mesh sizes-counts in one structure
 	squared = input.clone();
 	for (int v = 0; v < vMeshCount; ++v) {
 		for (int h = 0; h < hMeshCount; ++h) {
@@ -114,5 +169,7 @@ int main(int argc, char** argv)
 	// simplified = simplifyImageLUT(squared, colorCount);
 	cv::imshow("Output", simplified);
 	cv::waitKey(0);
+	// now create txt file with point coordinates
+	outputToolPath(simplified, vMeshCount, vMeshSize, hMeshCount, hMeshSize);
 	return 0;
 }
