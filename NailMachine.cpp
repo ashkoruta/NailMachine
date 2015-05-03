@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
 
 // global constants
@@ -77,6 +78,31 @@ void averageColor(cv::Mat &im, int v, const int h, const int vsz, const int hsz)
 	}
 	TRACE << "(" << v << "," << h << ") done" << std::endl;
 }
+cv::Mat simplifyImageThreshold(const cv::Mat &in)
+{
+	std::vector<cv::Mat> spl;
+	cv::split(in, spl); // split into three single-channel images
+	CV_Assert(spl.size() == ChannelNumber);
+	for (size_t i = 0; i < spl.size(); ++i) {
+		cv::threshold(spl[i], spl[i], UCHAR_MAX / 2, UCHAR_MAX, cv::THRESH_BINARY); // every pixel is either full-color or no-color
+	}
+	cv::Mat out;
+	cv::merge(spl, out); // merge
+	// so colors in output image are simple: red, blue, green or sum of 2-3 of them (purple, white, yellow etc)
+	return out;
+}
+cv::Mat simplifyImageLUT(const cv::Mat &in, const int colorCount)
+{
+	cv::Mat lookUpTable(1, 256, CV_8U);
+	uchar* p = lookUpTable.data;
+	const unsigned int divider = 256 / colorCount;
+	for (int i = 0; i < 256; ++i) {
+		p[i] = (uchar)(divider * (i / divider));
+	}
+	cv::Mat out;
+	cv::LUT(in, lookUpTable, out); // it simplifies channels, so we get not colorCount, but colorCount^3 colors (!)
+	return out;
+}
 
 int main(int argc, char** argv)
 {
@@ -99,6 +125,7 @@ int main(int argc, char** argv)
 	}
 	std::cout << "input channels " << input.channels() << " vertical size = " << input.rows << " horizontal size = " << input.cols << std::endl;
 	CV_Assert(input.channels() == ChannelNumber);
+
 	const int hMeshSize = input.cols / hMeshCount; // number of pixels in one mesh
 	const int vMeshSize = hMeshSize; // mesh is square so vertical size is the same
 	const int vMeshCount = input.rows / vMeshSize + (input.rows % vMeshSize ? 1 : 0); // how many square meshes needed to fill full length
@@ -114,13 +141,9 @@ int main(int argc, char** argv)
 	cv::imshow("Sampled picture", squared);
 	cv::waitKey(0);
 	// now lets lower number of different colors in the image
-	cv::Mat lookUpTable(1, 256, CV_8U);
-	uchar* p = lookUpTable.data;
-	const unsigned int divider = 256 / colorCount;
-	for (int i = 0; i < 256; ++i) {
-		p[i] = (uchar)(divider * (i / divider));
-	}
-	cv::LUT(squared, lookUpTable, simplified);
+	// thresholding for binary (red-not red) channels
+	simplified = simplifyImageThreshold(squared);
+	// simplified = simplifyImageLUT(squared, colorCount);
 	cv::imshow("Output", simplified);
 	cv::waitKey(0);
 	return 0;
