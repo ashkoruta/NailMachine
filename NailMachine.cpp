@@ -136,6 +136,7 @@ int main(int argc, char** argv)
 			// inside a mesh referenced by (v, h) we need to find average color and update every pixel
 			// no reference to channels here! suppose it's just a normal matrix
 			averageColor(squared, v, h, vMeshSize, hMeshSize);
+			std::cout << (v*hMeshCount + h) * 100.0 / (vMeshCount * hMeshCount) << "% " << std::endl;
 		}
 	}
 	cv::imshow("Sampled picture", squared);
