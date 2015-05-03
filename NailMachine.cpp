@@ -35,48 +35,16 @@ template<typename T> std::string channeledOutput(const T *avg)
 		ret << " ch#" << i << " " << (int)avg[i];
 	return ret.str();
 }
-void averageColor(cv::Mat &im, int v, const int h, const int vsz, const int hsz)
+void averageColor(cv::Mat &im, int v, int h, int vsz, int hsz)
 {
-	//TODO use mean / sum for God's sake
-	TRACE << " (" << v << "," << h << ") " << std::endl;
-	unsigned long avg[ChannelNumber] = {};
-	const int starthInd = h*hsz*ChannelNumber; // index of first column corresponding to start of horizontal mesh
+	const int starthInd = h*hsz; // index of first column corresponding to start of horizontal mesh
 	const int startvInd = v*vsz;  // index of first row corresponding to start of vertical mesh
-	const int maxhInd = std::min(im.cols*ChannelNumber, (h + 1)*hsz*ChannelNumber); // last mesh is not necessarily full-sized
+	const int maxhInd = std::min(im.cols, (h + 1)*hsz); // last mesh is not necessarily full-sized
 	const int maxvInd = std::min(im.rows, (v + 1)*vsz); // same thing
-	TRACE << startvInd << " " << starthInd << "/" << maxvInd << " " << maxhInd << std::endl;
-	// get aggregated sum of pixels by channels
-	for (int i = startvInd; i < maxvInd; ++i) { //for every row
-		const uchar *row = im.ptr<uchar>(i);
-		for (int j = starthInd; j < maxhInd; j += ChannelNumber) { // for every other column
-			TRACE << channeledOutput(row + j) << std::endl;
-			// here we explicitly use channeled representation. thus j points to first color of pixel. to access others: use ch (+0, +1, +2)
-			// j=0 j=1 j=2   j=3  
-			//  R   G   B   next pixel
-			for (int ch = 0; ch < ChannelNumber; ++ch) { // for every channel
-				avg[ch] += row[j + ch];
-			}
-		}
-	}
-	// now divide
-	for (int ch = 0; ch < ChannelNumber; ++ch) {
-		// need to divide by number of pixels. generally it's vsz*hsz but not on the edge (last meshes)
-		// so use indexes instead
-		avg[ch] = avg[ch]*ChannelNumber / ((maxvInd - startvInd)*(maxhInd - starthInd));
-	}
-	TRACE << channeledOutput(avg) << std::endl;
-	// and set this color everywhere inside this block
-	// FIXME surely there must be some easier way to iterate and not copy-paste
-	for (int i = startvInd; i < maxvInd; ++i) { //for every row
-		uchar *row = im.ptr<uchar>(i);
-		for (int j = starthInd; j < maxhInd; j += ChannelNumber) { // for every other column, same as above
-			for (int ch = 0; ch < ChannelNumber; ++ch) { // for every channel
-				CV_Assert(avg[ch] <= UCHAR_MAX); // for cast below
-				row[j + ch] = static_cast<uchar>(avg[ch]);
-			}
-		}
-	}
-	TRACE << "(" << v << "," << h << ") done" << std::endl;
+	// construct the submatrix for pixels from (v,h)
+	cv::Mat tmp = im.rowRange(cv::Range(startvInd, maxvInd)).colRange(cv::Range(starthInd, maxhInd));
+	cv::Scalar mean = cv::mean(tmp); // calculate mean value
+	cv::Mat(tmp.rows, tmp.cols, tmp.type(), mean).copyTo(tmp); // assign
 }
 cv::Mat simplifyImageThreshold(const cv::Mat &in)
 {
@@ -136,7 +104,6 @@ int main(int argc, char** argv)
 			// inside a mesh referenced by (v, h) we need to find average color and update every pixel
 			// no reference to channels here! suppose it's just a normal matrix
 			averageColor(squared, v, h, vMeshSize, hMeshSize);
-			std::cout << (v*hMeshCount + h) * 100.0 / (vMeshCount * hMeshCount) << "% " << std::endl;
 		}
 	}
 	cv::imshow("Sampled picture", squared);
