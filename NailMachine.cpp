@@ -9,6 +9,7 @@
 
 // global constants
 const int DotSize = 1; // 1 mm is minimal diameter possible
+const float DotSizeMetric = 0.001; // size in meters
 const int MaxNailWidth = 20; // no nails wider than 20mm exist
 const int hMeshCount = MaxNailWidth / DotSize; // number of meshes (they should be square so no concerning of longitudinal dimension)
 const int ChannelNumber = 3;
@@ -72,6 +73,22 @@ cv::Mat simplifyImageLUT(const cv::Mat &in, const int colorCount)
 	cv::LUT(in, lookUpTable, out); // it simplifies channels, so we get not colorCount, but colorCount^3 colors (!)
 	return out;
 }
+void scaleAndFileOutput(const cv::Mat &im, const std::string &filename)
+{
+	// open output file
+	std::ofstream out(filename);
+	// coordinates are counted from the middle of the nail and thus lie in
+	// X : (-width/2*Dotsize, width/2*Dotsize)
+	// Y : (-height/2*Dotsize, height/2*Dotsize)
+	// go row by row
+	for (int v = 0; v < im.rows; ++v) {
+		for (int h = 0; h < im.cols; ++h) {
+			if (!im.at<short>(v, h)) // this point has 0, not present in picture
+				continue;
+			out << (0.5 + h - im.cols / 2.0)*DotSize << "\t" << (0.5 + v - im.rows / 2.0)*DotSize << std::endl;
+		}
+	}
+}
 void outputToolPath(const cv::Mat &im, int vMeshCount, int vMeshSz, int hMeshCount, int hMeshSz)
 {
 	/* general outline
@@ -81,7 +98,6 @@ void outputToolPath(const cv::Mat &im, int vMeshCount, int vMeshSz, int hMeshCou
 		   2) AND three channel results. resulting matrix is same-color with this block
 		3) this matrix can be considered a bitmap for path points
 	*/
-	std::ofstream out("toolpaths.txt");
 	// reduced matrix
 	cv::Mat convert;
 	im.assignTo(convert, CV_16SC3); // store data in 16-bit signed shorts
@@ -115,13 +131,14 @@ void outputToolPath(const cv::Mat &im, int vMeshCount, int vMeshSz, int hMeshCou
 				TRACE << "SUBTRACT " << tmp << std::endl;
 				TRACE << "NOT " << ~tmp << std::endl;
 				diff = diff & (~tmp); // 0 where color channel is the same, not zero otherwise => logical not and then AND with previous result
-				TRACE << "AND with prev " << diff << std::endl;
+				TRACE << "BITMAP " << diff << std::endl;
 			}
 			// ok, we have a matrix of 1's where all channels are the same as in our current block
 			// these blocks should not be tested in future
 			alreadyProcessed = alreadyProcessed | diff;
-			out << i << "," << j << std::endl;
-			out << diff << std::endl;
+			std::stringstream filename;
+			filename << "toolpath." << i << "." << j << ".txt";
+			scaleAndFileOutput(diff, filename.str());
 		}
 	}
 }
