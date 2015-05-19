@@ -80,9 +80,9 @@ void scaleAndFileOutput(const cv::Mat &im, const std::string &filename)
 	// coordinates are counted from the middle of the nail and thus lie in
 	// X : (-width/2*Dotsize, width/2*Dotsize)
 	// Y : (-height/2*Dotsize, height/2*Dotsize)
-	// go row by row
-	for (int v = 0; v < im.rows; ++v) {
-		for (int h = 0; h < im.cols; ++h) {
+	// go column by column because it's simpler for physical tool
+	for (int h = 0; h < im.cols; ++h) {
+		for (int v = 0; v < im.rows; ++v) {
 			if (!im.at<short>(v, h)) // this point has 0, not present in picture
 				continue;
 			out << (0.5 + h - im.cols / 2.0)*DotSize << "\t" << (0.5 + v - im.rows / 2.0)*DotSize << std::endl;
