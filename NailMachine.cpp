@@ -152,13 +152,11 @@ int main(int argc, char** argv)
 	}
 	std::stringstream ss;
 	ss << argv[2];
-	int colorCount = 0;
-	ss >> colorCount;
-
+	
 	cv::Mat input, squared, simplified;
 	input = cv::imread(argv[1], CV_LOAD_IMAGE_COLOR); // Read the file
 	
-	if (!input.data || !colorCount) { // Check for invalid input
+	if (!input.data) { // Check for invalid input
 		std::cout << "Invalid input" << std::endl;
 		return -1;
 	}
