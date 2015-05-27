@@ -82,11 +82,33 @@ void scaleAndFileOutput(const cv::Mat &im, const std::string &filename)
 	// X : 0 is the most left, -width*Dotsize is most right
 	// Y : 0 is the top, -height*Dotsize is the bottom
 	// go column by column because it's simpler for physical tool
+	// we should traverse the nail in snake-like action to prevent large strokes from bottom to top
+	// also if there were no points in column, direction should stay the same
+	double lastY = 1.0; // last found point in current column
+	enum Direction {TopToBottom, BottomToTop} direction = TopToBottom;
 	for (int h = 0; h < im.cols; ++h) {
-		for (int v = 0; v < im.rows; ++v) {
-			if (!im.at<short>(v, h)) // this point has 0, not present in picture
-				continue;
-			out << (-0.5 - h)*DotSize << "\t" << (-0.5 - v)*DotSize << std::endl;
+		if (direction == TopToBottom) {
+			for (int v = 0; v < im.rows; ++v) {
+				if (!im.at<short>(v, h)) // this point has 0, not present in picture
+					continue;
+				lastY = (-0.5 - v)*DotSize;
+				out << (-0.5 - h)*DotSize << "\t" << (-0.5 - v)*DotSize << std::endl;
+			}
+			if (lastY < (im.rows / -2.0)*DotSize) {
+				// last point is near bottom, need to start next traversing from there
+				direction = BottomToTop;
+			}
+		} else { // BottomToTop
+			for (int v = im.rows - 1; v > -1; --v) { //FIXME copypaste because of this
+				if (!im.at<short>(v, h)) // this point has 0, not present in picture
+					continue;
+				lastY = (-0.5 - v)*DotSize;
+				out << (-0.5 - h)*DotSize << "\t" << (-0.5 - v)*DotSize << std::endl;
+			}
+			if (lastY > (im.rows / -2.0)*DotSize) {
+				// last point is near top, need to start next traversing from there
+				direction = TopToBottom;
+			}
 		}
 	}
 }
