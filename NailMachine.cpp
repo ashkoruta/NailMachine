@@ -10,7 +10,7 @@
 // global constants
 const int DotSize = 1; // 1 mm is minimal diameter possible
 const float DotSizeMetric = 0.001; // size in meters
-const int MaxNailWidth = 20; // no nails wider than 20mm exist
+const int MaxNailWidth = 10; // no nails wider than 20mm exist
 const int hMeshCount = MaxNailWidth / DotSize; // number of meshes (they should be square so no concerning of longitudinal dimension)
 const int ChannelNumber = 3;
 
