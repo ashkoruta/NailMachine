@@ -8,10 +8,8 @@
 #include <fstream>
 
 // global constants
-const int DotSize = 1; // 1 mm is minimal diameter possible
-const float DotSizeMetric = 0.001; // size in meters
-const int MaxNailWidth = 10; // no nails wider than 20mm exist
-const int hMeshCount = MaxNailWidth / DotSize; // number of meshes (they should be square so no concerning of longitudinal dimension)
+double DotSize = 1.0; // default size of marker dot. can be changed in main()
+int MaxNailWidth = 10; // no nails wider than 10mm exist can be changed in main()
 const int ChannelNumber = 3;
 
 std::stringstream devnull;
@@ -169,20 +167,32 @@ int main(int argc, char** argv)
 {
 	// open the file
 	if (argc < 2) {
-		std::cout << " Usage: NailMachine.exe fileToHandle" << std::endl;
+		std::cout << " Usage: NailMachine.exe fileToHandle [dot size, mm] [nail width, mm]" << std::endl;
 		return -1;
 	}
 	
 	cv::Mat input, squared, simplified;
 	input = cv::imread(argv[1], CV_LOAD_IMAGE_COLOR); // Read the file
 	
+	std::stringstream ss;
+	if (argc > 2) { // if additional arguments present
+		ss << argv[2];
+		ss >> DotSize; // user-defined dot size 
+	}
+	if (argc > 3) {
+		ss << argv[3];
+		ss >> MaxNailWidth; // user-defined nail width
+	}
+
 	if (!input.data) { // Check for invalid input
 		std::cout << "Invalid input" << std::endl;
 		return -1;
 	}
-	std::cout << "input channels " << input.channels() << " vertical size = " << input.rows << " horizontal size = " << input.cols << std::endl;
+	std::cout << "input channels " << input.channels() << " dot sz = " << DotSize << " nail width = " << MaxNailWidth 
+			  << " vertical sz = " << input.rows << " horizontal sz = " << input.cols << std::endl;
 	CV_Assert(input.channels() == ChannelNumber);
-
+	
+	const int hMeshCount = (1.0 * MaxNailWidth) / DotSize; // number of meshes (they should be square so no concerning of longitudinal dimension)
 	const int hMeshSize = input.cols / hMeshCount; // number of pixels in one mesh
 	const int vMeshSize = hMeshSize; // mesh is square so vertical size is the same
 	const int vMeshCount = input.rows / vMeshSize + (input.rows % vMeshSize ? 1 : 0); // how many square meshes needed to fill full length
