@@ -146,12 +146,10 @@ void outputToolPath(const cv::Mat &im, int vMeshCount, int vMeshSz, int hMeshCou
 int main(int argc, char** argv)
 {
 	// open the file
-	if (argc < 3) {
-		std::cout << " Usage: NailMachine.exe fileToHandle colorCount" << std::endl;
+	if (argc < 2) {
+		std::cout << " Usage: NailMachine.exe fileToHandle" << std::endl;
 		return -1;
 	}
-	std::stringstream ss;
-	ss << argv[2];
 	
 	cv::Mat input, squared, simplified;
 	input = cv::imread(argv[1], CV_LOAD_IMAGE_COLOR); // Read the file
